@@ -1,0 +1,26 @@
+# object files
+*.o
+
+# y86 binary files
+*.yo
+
+# generated C files
+sim/pipe/pipe-*.c
+sim/seq/seq-*.c
+
+# generated files for parsing hcl
+sim/misc/hcl.tab.c
+sim/misc/hcl.tab.h
+sim/misc/yas-grammar.c
+sim/misc/lex.yy.c
+
+# generated pipe driver files
+sim/pipe/ldriver.ys
+sim/pipe/sdriver.ys
+
+# executables
+sim/misc/yas
+sim/misc/yis
+sim/misc/hcl2c
+sim/seq/ssim
+sim/pipe/psim
