@@ -1,0 +1,17 @@
+   irmovq stack, %rsp
+   call proc           
+   irmovq $0xf,%rdx     
+   halt
+proc:
+    irmovq $1, %rax
+    irmovq $-1, %rbx
+    addq %rax, %rbx
+    dje target   # TAKEN
+    ret          # TAKEN                 
+    irmovq $3, %rcx        
+target:
+    halt
+.pos 0x200
+stack:                
+
+# Expected result: 0xf in %rdx

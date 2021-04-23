@@ -1,0 +1,14 @@
+    irmovq $1, %rax
+    irmovq $-1, %rbx
+    addq %rax, %rbx
+    dje target   # TAKEN
+    jne label    # NOT-TAKEN
+    irmovq $3, %rcx
+target:
+    iaddq $0xf, %rdx
+    halt
+label:
+	iaddq $0xe, %rdx
+    halt
+# Expect result: 0xf in %rdx
+#                0x0 in $rcx (NOT CHANGED)

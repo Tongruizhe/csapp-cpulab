@@ -4,10 +4,7 @@
 #    Copyright (C) Randal E. Bryant, David R. O'Hallaron, 2014     #
 ####################################################################
 
-## Your task is to implement the iaddq instruction
-## The file contains a declaration of the icodes
-## for iaddq (IIADDQ)
-## Your job is to add the rest of the logic to make it work
+### HCL code for delayed-jump instruction
 
 ####################################################################
 #    C Include's.  Don't alter these                               #
@@ -41,6 +38,10 @@ wordsig IPOPQ	'I_POPQ'
 # Instruction code for iaddq instruction
 wordsig IIADDQ	'I_IADDQ'
 
+####################
+wordsig IDJXX 'I_DJMP'
+#####################
+
 ##### Symbolic represenations of Y86-64 function codes            #####
 wordsig FNONE    'F_NONE'        # Default function code
 
@@ -50,6 +51,7 @@ wordsig RNONE    'REG_NONE'   	     # Special value indicating "no register"
 
 ##### ALU Functions referenced explicitly ##########################
 wordsig ALUADD	'A_ADD'		     # ALU should add its arguments
+wordsig UNCOND 	'C_YES'       	 # Unconditional transfer
 
 ##### Possible instruction status values                       #####
 wordsig SBUB	'STAT_BUB'	# Bubble in stage
@@ -80,6 +82,7 @@ wordsig D_icode 'if_id_curr->icode'   # Instruction code
 wordsig D_rA 'if_id_curr->ra'	     # rA field from instruction
 wordsig D_rB 'if_id_curr->rb'	     # rB field from instruction
 wordsig D_valP 'if_id_curr->valp'     # Incremented PC
+wordsig D_valC 'if_id_curr->valc'	# Constant data of fetched instruction
 
 ##### Intermediate Values in Decode Stage  #########################
 
@@ -126,7 +129,7 @@ wordsig W_dstE 'mem_wb_curr->deste'	# Destination E register ID
 wordsig W_valE  'mem_wb_curr->vale'      # ALU E value
 wordsig W_dstM 'mem_wb_curr->destm'	# Destination M register ID
 wordsig W_valM  'mem_wb_curr->valm'	# Memory M value
-
+boolsig W_Cnd 	'mem_wb_curr->takebranch' # Condition flag
 ####################################################################
 #    Control Signal Definitions.                                   #
 ####################################################################
@@ -135,10 +138,20 @@ wordsig W_valM  'mem_wb_curr->valm'	# Memory M value
 
 ## What address should instruction be fetched at
 word f_pc = [
+	# IDJXX taken but the followed IJXX mispredicted.
+	W_icode == IDJXX && W_Cnd 
+		&& M_icode == IJXX && !M_Cnd: W_valE; 
+	
 	# Mispredicted branch.  Fetch at incremented PC
 	M_icode == IJXX && !M_Cnd : M_valA;
+
+	# Mispredicted delayed branch followed by an taken branch
+	M_icode == IDJXX && !M_Cnd 
+		&& !E_icode in { IRET, ICALL, IJXX } : M_valA;
+
 	# Completion of RET instruction
 	W_icode == IRET : W_valM;
+	
 	# Default: Use predicted value of PC
 	1 : F_predPC;
 ];
@@ -158,7 +171,7 @@ word f_ifun = [
 # Is instruction valid?
 bool instr_valid = f_icode in 
 	{ INOP, IHALT, IRRMOVQ, IIRMOVQ, IRMMOVQ, IMRMOVQ,
-	  IOPQ, IJXX, ICALL, IRET, IPUSHQ, IPOPQ };
+	  IOPQ, IJXX, ICALL, IRET, IPUSHQ, IPOPQ, IIADDQ, IDJXX};
 
 # Determine status code for fetched instruction
 word f_stat = [
@@ -171,15 +184,16 @@ word f_stat = [
 # Does fetched instruction require a regid byte?
 bool need_regids =
 	f_icode in { IRRMOVQ, IOPQ, IPUSHQ, IPOPQ, 
-		     IIRMOVQ, IRMMOVQ, IMRMOVQ };
+		     IIRMOVQ, IRMMOVQ, IMRMOVQ, IIADDQ };
 
 # Does fetched instruction require a constant word?
 bool need_valC =
-	f_icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ, IJXX, ICALL };
+	f_icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ, IJXX, ICALL, IIADDQ, IDJXX};
 
 # Predict next value of PC
 word f_predPC = [
-	f_icode in { IJXX, ICALL } : f_valC;
+	f_icode in { IJXX, ICALL} : f_valC;
+	D_icode in { IDJXX } : D_valC;
 	1 : f_valP;
 ];
 
@@ -195,14 +209,14 @@ word d_srcA = [
 
 ## What register should be used as the B source?
 word d_srcB = [
-	D_icode in { IOPQ, IRMMOVQ, IMRMOVQ  } : D_rB;
+	D_icode in { IOPQ, IRMMOVQ, IMRMOVQ, IIADDQ  } : D_rB;
 	D_icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP;
 	1 : RNONE;  # Don't need register
 ];
 
 ## What register should be used as the E destination?
 word d_dstE = [
-	D_icode in { IRRMOVQ, IIRMOVQ, IOPQ} : D_rB;
+	D_icode in { IRRMOVQ, IIRMOVQ, IOPQ, IIADDQ } : D_rB;
 	D_icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP;
 	1 : RNONE;  # Don't write any register
 ];
@@ -216,7 +230,8 @@ word d_dstM = [
 ## What should be the A value?
 ## Forward into decode stage for valA
 word d_valA = [
-	D_icode in { ICALL, IJXX } : D_valP; # Use incremented PC
+	D_icode in { ICALL, IJXX} : D_valP; # Use incremented PC
+	D_icode == IDJXX : f_valP;    # Address of the next next instruction
 	d_srcA == e_dstE : e_valE;    # Forward valE from execute
 	d_srcA == M_dstM : m_valM;    # Forward valM from memory
 	d_srcA == M_dstE : M_valE;    # Forward valE from memory
@@ -239,7 +254,7 @@ word d_valB = [
 ## Select input A to ALU
 word aluA = [
 	E_icode in { IRRMOVQ, IOPQ } : E_valA;
-	E_icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ } : E_valC;
+	E_icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ, IIADDQ, IDJXX } : E_valC;
 	E_icode in { ICALL, IPUSHQ } : -8;
 	E_icode in { IRET, IPOPQ } : 8;
 	# Other instructions don't need ALU
@@ -248,8 +263,8 @@ word aluA = [
 ## Select input B to ALU
 word aluB = [
 	E_icode in { IRMMOVQ, IMRMOVQ, IOPQ, ICALL, 
-		     IPUSHQ, IRET, IPOPQ } : E_valB;
-	E_icode in { IRRMOVQ, IIRMOVQ } : 0;
+		     IPUSHQ, IRET, IPOPQ, IIADDQ } : E_valB;
+	E_icode in { IRRMOVQ, IIRMOVQ, IDJXX } : 0;
 	# Other instructions don't need ALU
 ];
 
@@ -260,7 +275,7 @@ word alufun = [
 ];
 
 ## Should the condition codes be updated?
-bool set_cc = E_icode == IOPQ &&
+bool set_cc = (E_icode == IOPQ || E_icode == IIADDQ) &&
 	# State changes only during normal operation
 	!m_stat in { SADR, SINS, SHLT } && !W_stat in { SADR, SINS, SHLT };
 
@@ -336,6 +351,7 @@ bool D_stall =
 bool D_bubble =
 	# Mispredicted branch
 	(E_icode == IJXX && !e_Cnd) ||
+	(E_icode == IDJXX && !e_Cnd && !D_icode in { IJXX, IRET, ICALL }) ||
 	# Stalling at fetch while ret passes through pipeline
 	# but not condition for a load/use hazard
 	!(E_icode in { IMRMOVQ, IPOPQ } && E_dstM in { d_srcA, d_srcB }) &&
