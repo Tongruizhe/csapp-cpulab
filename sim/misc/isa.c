@@ -94,7 +94,13 @@ instr_t instruction_set[] =
     {"iaddq",  HPACK(I_IADDQ, F_NONE), 10, I_ARG, 2, 8, R_ARG, 1, 0 },
     /* this is just a hack to make the I_POP2 code have an associated name */
     {"pop2",   HPACK(I_POP2, F_NONE) , 0, NO_ARG, 0, 0, NO_ARG, 0, 0 },
-
+    {"djmp",    HPACK(I_DJMP, C_YES), 9, I_ARG, 1, 8, NO_ARG, 0, 0 },
+    {"djle",    HPACK(I_DJMP, C_LE), 9, I_ARG, 1, 8, NO_ARG, 0, 0 },
+    {"djl",     HPACK(I_DJMP, C_L), 9, I_ARG, 1, 8, NO_ARG, 0, 0 },
+    {"dje",     HPACK(I_DJMP, C_E), 9, I_ARG, 1, 8, NO_ARG, 0, 0 },
+    {"djne",    HPACK(I_DJMP, C_NE), 9, I_ARG, 1, 8, NO_ARG, 0, 0 },
+    {"djge",    HPACK(I_DJMP, C_GE), 9, I_ARG, 1, 8, NO_ARG, 0, 0 },
+    {"djg",     HPACK(I_DJMP, C_G), 9, I_ARG, 1, 8, NO_ARG, 0, 0 },
     /* For allocation instructions, arg1hi indicates number of bytes */
     {".byte",  0x00, 1, I_ARG, 0, 1, NO_ARG, 0, 0 },
     {".word",  0x00, 2, I_ARG, 0, 2, NO_ARG, 0, 0 },

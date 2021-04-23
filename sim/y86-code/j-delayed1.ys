@@ -1,0 +1,11 @@
+	      irmovq $1, %rax
+          irmovq $-1, %rbx
+          addq %rax, %rbx
+	      djne target
+          jmp label
+          irmovq $3, %rcx
+target:
+          halt
+label:
+	      irmovq $4, %rdx
+          halt

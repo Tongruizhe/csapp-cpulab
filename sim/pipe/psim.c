@@ -1561,6 +1561,7 @@ void do_mem_stage()
     }
     mem_wb_next->icode = ex_mem_curr->icode;
     mem_wb_next->ifun = ex_mem_curr->ifun;
+    mem_wb_next->takebranch = ex_mem_curr->takebranch;
     mem_wb_next->vale = ex_mem_curr->vale;
     mem_wb_next->valm = valm;
     mem_wb_next->deste = ex_mem_curr->deste;

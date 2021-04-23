@@ -59,6 +59,7 @@ typedef struct {
 typedef struct {
     byte_t icode;        /* Instruction code */
     byte_t ifun;         /* ALU/JMP qualifier */
+    bool_t takebranch;   /* Taken branch signal */
     word_t vale;         /* valE */
     word_t valm;         /* valM */
     byte_t deste; /* Destination register for valE */
